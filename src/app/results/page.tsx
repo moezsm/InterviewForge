@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
-import Loading from "@/components/Loading";
 import ResultSummary from "@/components/ResultSummary";
 import { scoreAnswers } from "@/lib/scoring";
 import type { Question, ScoreResult } from "@/types";
@@ -16,37 +15,41 @@ interface StoredSessionData {
   userAnswers: Record<string, string>;
 }
 
+function getSessionSnapshot(): string | null {
+  return sessionStorage.getItem(SESSION_STORAGE_KEY);
+}
+
+function getServerSnapshot(): string | null {
+  return null;
+}
+
+function subscribe(callback: () => void): () => void {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
 export default function ResultsPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [categoryId, setCategoryId] = useState<string>();
-  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
+  const storedSession = useSyncExternalStore(subscribe, getSessionSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const storedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  const { categoryId, scoreResult } = useMemo<{
+    categoryId?: string;
+    scoreResult: ScoreResult | null;
+  }>(() => {
+    if (!storedSession) {
+      return { scoreResult: null };
+    }
 
-      if (!storedSession) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { questions, userAnswers, categoryId: storedCategoryId } =
-          JSON.parse(storedSession) as StoredSessionData;
-
-        setCategoryId(storedCategoryId);
-        setScoreResult(scoreAnswers(questions, userAnswers));
-      } catch {
-        setScoreResult(null);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, []);
+    try {
+      const { questions, userAnswers, categoryId: storedCategoryId } =
+        JSON.parse(storedSession) as StoredSessionData;
+      return {
+        categoryId: storedCategoryId,
+        scoreResult: scoreAnswers(questions, userAnswers),
+      };
+    } catch {
+      return { scoreResult: null };
+    }
+  }, [storedSession]);
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8">
@@ -60,9 +63,7 @@ export default function ResultsPage() {
           </p>
         </header>
 
-        {isLoading ? (
-          <Loading message="Loading results..." />
-        ) : scoreResult ? (
+        {scoreResult ? (
           <ResultSummary scoreResult={scoreResult} categoryId={categoryId} />
         ) : (
           <div className="space-y-4 rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-center dark:border-zinc-700">
