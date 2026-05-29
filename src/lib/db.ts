@@ -2,14 +2,19 @@ import { Category } from "@/types/category";
 import { Question } from "@/types/question";
 import { Session } from "@/types/session";
 import { randomUUID } from "crypto";
+import { supabase } from "./supabase";
 
-const categories: Category[] = [
+// ---------------------------------------------------------------------------
+// In-memory fallback store (used when Supabase env vars are not configured)
+// ---------------------------------------------------------------------------
+
+const memCategories: Category[] = [
   { id: "cat-backend", name: "Backend Development" },
   { id: "cat-frontend", name: "Frontend Development" },
   { id: "cat-system-design", name: "System Design" },
 ];
 
-const questions: Question[] = [
+const memQuestions: Question[] = [
   // Backend Development
   {
     id: "q1",
@@ -79,57 +84,170 @@ const questions: Question[] = [
   },
 ];
 
-const sessions: Session[] = [];
+const memSessions: Session[] = [];
 
-export function getCategories(): Category[] {
-  return [...categories];
+// ---------------------------------------------------------------------------
+// Categories
+// ---------------------------------------------------------------------------
+
+export async function getCategories(): Promise<Category[]> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("id, name")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({ id: row.id, name: row.name }));
+  }
+  return [...memCategories];
 }
 
-export function getCategoryById(id: string): Category | undefined {
-  return categories.find((c) => c.id === id);
+export async function getCategoryById(id: string): Promise<Category | undefined> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("id, name")
+      .eq("id", id)
+      .single();
+    if (error) return undefined;
+    return data ? { id: data.id, name: data.name } : undefined;
+  }
+  return memCategories.find((c) => c.id === id);
 }
 
-export function getQuestionsByCategory(categoryId: string): Question[] {
-  return questions.filter((q) => q.categoryId === categoryId);
-}
-
-export function getAllQuestions(): Question[] {
-  return [...questions];
-}
-
-export function addCategory(name: string): Category {
+export async function addCategory(name: string): Promise<Category> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("categories")
+      .insert({ name })
+      .select("id, name")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: data.id, name: data.name };
+  }
   const category: Category = { id: randomUUID(), name };
-  categories.push(category);
+  memCategories.push(category);
   return category;
 }
 
-export function addQuestion(
+// ---------------------------------------------------------------------------
+// Questions
+// ---------------------------------------------------------------------------
+
+export async function getQuestionsByCategory(categoryId: string): Promise<Question[]> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("questions")
+      .select("id, category_id, question_text, correct_answer")
+      .eq("category_id", categoryId);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      categoryId: row.category_id,
+      questionText: row.question_text,
+      correctAnswer: row.correct_answer,
+    }));
+  }
+  return memQuestions.filter((q) => q.categoryId === categoryId);
+}
+
+export async function getAllQuestions(): Promise<Question[]> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("questions")
+      .select("id, category_id, question_text, correct_answer");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      categoryId: row.category_id,
+      questionText: row.question_text,
+      correctAnswer: row.correct_answer,
+    }));
+  }
+  return [...memQuestions];
+}
+
+export async function addQuestion(
   categoryId: string,
   questionText: string,
   correctAnswer: string
-): Question {
+): Promise<Question> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("questions")
+      .insert({ category_id: categoryId, question_text: questionText, correct_answer: correctAnswer })
+      .select("id, category_id, question_text, correct_answer")
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      categoryId: data.category_id,
+      questionText: data.question_text,
+      correctAnswer: data.correct_answer,
+    };
+  }
   const question: Question = {
     id: randomUUID(),
     categoryId,
     questionText,
     correctAnswer,
   };
-  questions.push(question);
+  memQuestions.push(question);
   return question;
 }
 
-export function addSession(
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+export async function addSession(
   session: Omit<Session, "id" | "createdAt">
-): Session {
+): Promise<Session> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("sessions")
+      .insert({
+        category_id: session.categoryId,
+        question_ids: session.questionIds,
+        user_answers: session.userAnswers,
+        score: session.score,
+      })
+      .select("id, category_id, question_ids, user_answers, score, created_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      categoryId: data.category_id,
+      questionIds: data.question_ids,
+      userAnswers: data.user_answers,
+      score: data.score,
+      createdAt: data.created_at,
+    };
+  }
   const newSession: Session = {
     ...session,
     id: randomUUID(),
     createdAt: new Date().toISOString(),
   };
-  sessions.push(newSession);
+  memSessions.push(newSession);
   return newSession;
 }
 
-export function getSessions(): Session[] {
-  return [...sessions];
+export async function getSessions(): Promise<Session[]> {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("id, category_id, question_ids, user_answers, score, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      categoryId: row.category_id,
+      questionIds: row.question_ids,
+      userAnswers: row.user_answers,
+      score: row.score,
+      createdAt: row.created_at,
+    }));
+  }
+  return [...memSessions];
 }

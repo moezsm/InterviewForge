@@ -7,7 +7,7 @@ interface CreateCategoryBody {
 }
 
 export async function GET() {
-  const categories: Category[] = getCategories();
+  const categories: Category[] = await getCategories();
   return NextResponse.json(categories);
 }
 
@@ -22,6 +22,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const category: Category = addCategory(trimmedName);
+  const category: Category = await addCategory(trimmedName);
   return NextResponse.json(category, { status: 201 });
 }

@@ -11,8 +11,8 @@ interface CreateQuestionBody {
 export async function GET(request: NextRequest) {
   const categoryId = request.nextUrl.searchParams.get("categoryId")?.trim();
   const questions: Question[] = categoryId
-    ? getQuestionsByCategory(categoryId)
-    : getAllQuestions();
+    ? await getQuestionsByCategory(categoryId)
+    : await getAllQuestions();
 
   return NextResponse.json(questions);
 }
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const question: Question = addQuestion(
+  const question: Question = await addQuestion(
     trimmedCategoryId,
     trimmedQuestionText,
     trimmedCorrectAnswer
