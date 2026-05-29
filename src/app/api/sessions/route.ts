@@ -10,7 +10,7 @@ interface CreateSessionBody {
 }
 
 export async function GET() {
-  const sessions: Session[] = getSessions();
+  const sessions: Session[] = await getSessions();
   return NextResponse.json(sessions);
 }
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const session = addSession({
+  const session = await addSession({
     categoryId: trimmedCategoryId,
     questionIds: validQuestionIds,
     userAnswers,
