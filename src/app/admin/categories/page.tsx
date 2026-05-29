@@ -1,57 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 
 import CategoryForm from "@/components/CategoryForm";
 import CategoryList from "@/components/CategoryList";
 import Loading from "@/components/Loading";
 import type { Category } from "@/types";
 
-export default function AdminCategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface State {
+  categories: Category[];
+  isLoading: boolean;
+  version: number;
+}
 
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await fetch("/api/categories");
-      const data: Category[] = await response.json();
-      setCategories(data);
-    } catch {
-      setCategories([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+type Action =
+  | { type: "LOADED"; categories: Category[] }
+  | { type: "ERROR" }
+  | { type: "REFRESH" };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "LOADED":
+      return { ...state, categories: action.categories, isLoading: false };
+    case "ERROR":
+      return { ...state, categories: [], isLoading: false };
+    case "REFRESH":
+      return { ...state, isLoading: true, version: state.version + 1 };
+  }
+}
+
+export default function AdminCategoriesPage() {
+  const [state, dispatch] = useReducer(reducer, {
+    categories: [],
+    isLoading: true,
+    version: 0,
+  });
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadCategories = async () => {
-      try {
-        const response = await fetch("/api/categories");
-        const data: Category[] = await response.json();
-
-        if (isMounted) {
-          setCategories(data);
-        }
-      } catch {
-        if (isMounted) {
-          setCategories([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadCategories();
-
+    let cancelled = false;
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data: Category[]) => {
+        if (!cancelled) dispatch({ type: "LOADED", categories: data });
+      })
+      .catch(() => {
+        if (!cancelled) dispatch({ type: "ERROR" });
+      });
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [state.version]);
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8">
@@ -83,8 +82,7 @@ export default function AdminCategoriesPage() {
           </h2>
           <CategoryForm
             onSuccess={() => {
-              setIsLoading(true);
-              void fetchCategories();
+              dispatch({ type: "REFRESH" });
             }}
           />
         </section>
@@ -93,10 +91,10 @@ export default function AdminCategoriesPage() {
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
             Existing Categories
           </h2>
-          {isLoading ? (
+          {state.isLoading ? (
             <Loading message="Loading categories..." />
-          ) : categories.length > 0 ? (
-            <CategoryList categories={categories} />
+          ) : state.categories.length > 0 ? (
+            <CategoryList categories={state.categories} />
           ) : (
             <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-center text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
               No categories available yet.
