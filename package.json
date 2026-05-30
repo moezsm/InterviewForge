@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "tsx scripts/seed-dotnet-lead.ts && tsx scripts/seed-azure-cicd.ts",
+    "postbuild": "tsx scripts/seed-dotnet-lead.ts && tsx scripts/seed-azure-cicd.ts && tsx scripts/seed-openshift-dotnet-lead.ts && tsx scripts/seed-kafka.ts",
     "start": "next start",
     "lint": "eslint",
     "seed:dotnet-lead": "tsx scripts/seed-dotnet-lead.ts",
-    "seed:azure-cicd": "tsx scripts/seed-azure-cicd.ts"
+    "seed:azure-cicd": "tsx scripts/seed-azure-cicd.ts",
+    "seed:openshift-dotnet-lead": "tsx scripts/seed-openshift-dotnet-lead.ts",
+    "seed:kafka": "tsx scripts/seed-kafka.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
