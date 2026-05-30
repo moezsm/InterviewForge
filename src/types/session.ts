@@ -1,3 +1,5 @@
+export type TestMode = "exam" | "practice";
+
 export interface Session {
   id: string;
   categoryId: string;
